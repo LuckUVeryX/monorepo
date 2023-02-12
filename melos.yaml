@@ -1,0 +1,86 @@
+name: mono_repo
+
+sdkPath: .fvm/flutter_sdk
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+packages:
+  - apps/*
+  - packages/*
+
+scripts:
+  format:
+    run: dart format . --set-exit-if-changed
+    description: Formats all files in this project.
+
+  analyze:
+    run: melos exec flutter analyze .
+    description: Run `dart analyze` in all packages.
+
+  fix:
+    run: dart fix --apply
+    description: Automatically quick fixes issues identified by `dart analyze`
+    
+  generate:
+    run: melos exec flutter packages pub get && melos run generate:dart && melos run generate:flutter && melos exec flutter pub get
+    description: Build all generated files for Dart & Flutter packages in this project.
+
+  generate:dart:
+    run: melos exec --depends-on="build_runner" --no-flutter -- "dart run build_runner build --delete-conflicting-outputs"
+    description: Build all generated files for Dart packages in this project.
+
+  generate:flutter:
+    run: melos exec --depends-on="build_runner" --flutter -- "flutter pub run build_runner build --delete-conflicting-outputs"
+    description: Build all generated files for Flutter packages in this project.
+
+  test:
+    run: melos run test:dart --no-select && melos run test:flutter --no-select
+    description: Run all Dart & Flutter tests in this project.
+
+  test:dart:
+    run: melos exec --dir-exists="test" --fail-fast -- "dart test"
+    description: Run Dart tests for a specific package in this project.
+    select-package:
+      flutter: false
+      dir-exists: test
+
+  test:flutter:
+    run: melos exec --dir-exists="test" --fail-fast -- "flutter test"
+    description: Run Flutter tests for a specific package in this project.
+    select-package:
+      flutter: true
+      dir-exists: test
+
+  build:stg:apk:
+    run: melos exec "flutter build apk --flavor staging --target lib/main_staging.dart --debug"
+    description: Builds Staging APKs.
+    select-package:
+      scope: [candidate, employer]
+
+  build:prod:apk:
+    run: melos exec "flutter build apk --flavor production --target lib/main_production.dart"
+    description: Builds Production APKs.
+    select-package:
+      scope: [candidate, employer]
+
+  codemagic:rename:apk:
+    run: |
+      melos exec "mv build/app/outputs/flutter-apk/*.apk \
+        build/app/outputs/flutter-apk/MELOS_PACKAGE_NAME.apk"
+    description: Renames apk to differentiate between apps.
+    select-package:
+      scope: [candidate, employer]
+
+  build:stg:ios:
+    run: melos exec "flutter build ipa --flavor staging --target lib/main_staging.dart --debug"
+    description: Builds Staging ipa.
+    select-package:
+      scope: [candidate, employer]
+
+  build:prod:ios:
+    run: melos exec "flutter build ipa --flavor production --target lib/main_production.dart"
+    description: Builds Production ipa.
+    select-package:
+      scope: [candidate, employer]

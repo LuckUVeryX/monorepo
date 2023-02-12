@@ -1,0 +1,95 @@
+definitions:
+  instance_mac_mini_m1: &instance_mac_mini_m1
+    instance_type: mac_mini_m1
+    max_build_duration: 30
+  
+  
+  env_versions: &env_versions
+    flutter: stable
+    vars:
+      MELOS_SDK_PATH: $FLUTTER_ROOT
+    
+  when_changeset: &when_changeset
+    changeset:
+      includes:
+        - "apps/**"
+        - "packages/**"
+        - "codemagic.yaml"
+      excludes:
+        - "**/*.md"
+  
+  scripts:
+    - &dart_path
+      name: Add Dart to PATH
+      script: |
+          echo PATH="$PATH":"$FLUTTER_ROOT/.pub-cache/bin" >> $CM_ENV
+          echo PATH="$PATH":"$FLUTTER_ROOT/bin" >> $CM_ENV
+    
+    - &bootstrap
+      name: Melos Bootstrap
+      script: |
+        dart pub global activate melos
+        melos bootstrap
+
+    - &format
+      name: Run Format
+      script: melos run format
+
+    - &codegen
+      name: Run Codegen
+      script: melos run generate
+
+    - &analyze
+      name: Run Analyze
+      script: melos run analyze
+
+    - &test
+      name: Run Tests
+      script: melos run test
+
+workflows:
+  ci:
+    name: CI
+    <<: *instance_mac_mini_m1
+    environment:
+      <<: *env_versions
+    when:
+      <<: *when_changeset
+    scripts:
+      - *dart_path
+      - *bootstrap
+      - *format
+      - *codegen
+      - *analyze
+      - *test
+  
+  android_staging:
+    name: Android Staging
+    <<: *instance_mac_mini_m1
+    environment:
+      <<: *env_versions
+    when:
+      <<: *when_changeset
+    triggering:
+      events: [pull_request]
+    scripts:
+      - *dart_path
+      - *bootstrap
+      - *format
+      - *codegen
+      - *analyze
+      - *test
+      - name: Build apk
+        script: |
+          melos run build:stg:apk
+      - name: Rename the apk file
+        script: melos run codemagic:rename:apk
+    artifacts:
+      - apps/**/build/**/outputs/flutter-apk/*.apk 
+    publishing:
+      slack:
+        channel: '#mobile-monorepo-cicd'
+        notify_on_build_start: false
+        notify:
+          success: true
+          failure: true
